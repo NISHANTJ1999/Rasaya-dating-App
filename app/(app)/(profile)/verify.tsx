@@ -4,10 +4,13 @@ import { router } from "expo-router";
 import { useState, useRef } from "react";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { Ionicons } from "@expo/vector-icons";
+import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { Button } from "@/components/ui/Button";
 import { useAuthStore } from "@/lib/stores/auth-store";
+import { validateSelfie } from "@/lib/photo-validation";
 
 type VerificationStep = "intro" | "camera" | "review" | "processing" | "complete";
 
@@ -21,47 +24,66 @@ export default function VerifyScreen() {
   const [step, setStep] = useState<VerificationStep>("intro");
   const [currentPose, setCurrentPose] = useState(0);
   const [photos, setPhotos] = useState<string[]>([]);
+  const [captureError, setCaptureError] = useState<string | null>(null);
+  const [isCapturing, setIsCapturing] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
-  const user = useAuthStore((s) => s.user);
+  const completeVerification = useAuthStore((s) => s.completeVerification);
 
   const takeSelfie = async () => {
-    if (!cameraRef.current) return;
+    if (!cameraRef.current || isCapturing) return;
 
     try {
+      setIsCapturing(true);
+      setCaptureError(null);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.8,
-      });
 
-      if (photo?.uri) {
-        const newPhotos = [...photos, photo.uri];
-        setPhotos(newPhotos);
+      const photo = await cameraRef.current.takePictureAsync({ quality: 0.8 });
+      if (!photo?.uri) return;
 
-        if (currentPose < POSE_INSTRUCTIONS.length - 1) {
-          setCurrentPose(currentPose + 1);
-        } else {
-          setStep("review");
-        }
+      // Validate with real face detection
+      const result = await validateSelfie(photo.uri);
+
+      if (!result.valid) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        setCaptureError(result.reason ?? "Selfie validation failed. Try again.");
+        return;
+      }
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      const newPhotos = [...photos, photo.uri];
+      setPhotos(newPhotos);
+
+      if (currentPose < POSE_INSTRUCTIONS.length - 1) {
+        setCurrentPose(currentPose + 1);
+      } else {
+        setStep("review");
       }
     } catch (error) {
       console.error("Failed to take photo:", error);
+      setCaptureError("Camera error. Please try again.");
+    } finally {
+      setIsCapturing(false);
     }
   };
 
   const handleSubmit = async () => {
     setStep("processing");
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
-    // Simulate verification processing
-    await new Promise((resolve) => setTimeout(resolve, 3000));
-
-    setStep("complete");
+    try {
+      await completeVerification(photos);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setStep("complete");
+    } catch (error) {
+      console.error("Verification failed:", error);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setStep("review");
+    }
   };
 
   const handleRetry = () => {
     setPhotos([]);
     setCurrentPose(0);
+    setCaptureError(null);
     setStep("camera");
   };
 
@@ -77,7 +99,7 @@ export default function VerifyScreen() {
           <Text className="text-base text-neutral-500 text-center mb-6">
             We need access to your camera to verify your identity with a selfie.
           </Text>
-          <Button title="Grant Camera Access" onPress={requestPermission} />
+          <Button title="Grant Camera Access" onPress={requestPermission} variant="gradient" />
         </View>
       </SafeAreaView>
     );
@@ -98,26 +120,50 @@ export default function VerifyScreen() {
       {/* Intro Step */}
       {step === "intro" && (
         <View className="flex-1 px-6 items-center justify-center">
-          <View className="w-24 h-24 rounded-full bg-blue-100 items-center justify-center mb-6">
-            <Ionicons name="shield-checkmark" size={48} color="#3B82F6" />
-          </View>
-          <Text className="text-2xl font-bold text-neutral-900 dark:text-white text-center mb-3">
+          <Animated.View
+            entering={FadeIn.duration(500)}
+            className="w-24 h-24 rounded-full items-center justify-center mb-6 overflow-hidden"
+          >
+            <LinearGradient
+              colors={["#3B82F6", "#7C3AED"]}
+              style={{ width: 96, height: 96, borderRadius: 48, alignItems: "center", justifyContent: "center" }}
+            >
+              <Ionicons name="shield-checkmark" size={48} color="#FFFFFF" />
+            </LinearGradient>
+          </Animated.View>
+
+          <Animated.Text
+            entering={FadeInDown.delay(200).duration(400)}
+            className="text-2xl font-bold text-neutral-900 dark:text-white text-center mb-3"
+          >
             Get Verified
-          </Text>
-          <Text className="text-base text-neutral-500 text-center leading-6 mb-2">
+          </Animated.Text>
+          <Animated.Text
+            entering={FadeInDown.delay(300).duration(400)}
+            className="text-base text-neutral-500 text-center leading-6 mb-2"
+          >
             Verified profiles get 40% more matches. We'll ask you to take 3 quick selfies to confirm you match your photos.
-          </Text>
+          </Animated.Text>
 
           <View className="w-full mt-8 gap-4">
             {POSE_INSTRUCTIONS.map((instruction, i) => (
-              <View key={i} className="flex-row items-center gap-3">
-                <View className="w-8 h-8 rounded-full bg-primary-100 items-center justify-center">
-                  <Text className="text-sm font-bold text-primary-500">{i + 1}</Text>
+              <Animated.View
+                key={i}
+                entering={FadeInDown.delay(400 + i * 100).duration(400)}
+                className="flex-row items-center gap-3"
+              >
+                <View className="w-8 h-8 rounded-full overflow-hidden">
+                  <LinearGradient
+                    colors={["#FF6B35", "#7C3AED"]}
+                    style={{ width: 32, height: 32, alignItems: "center", justifyContent: "center" }}
+                  >
+                    <Text className="text-sm font-bold text-white">{i + 1}</Text>
+                  </LinearGradient>
                 </View>
                 <Text className="text-base text-neutral-700 dark:text-neutral-300">
                   {instruction}
                 </Text>
-              </View>
+              </Animated.View>
             ))}
           </View>
 
@@ -125,11 +171,10 @@ export default function VerifyScreen() {
             <Button
               title="Start Verification"
               onPress={async () => {
-                if (!permission?.granted) {
-                  await requestPermission();
-                }
+                if (!permission?.granted) await requestPermission();
                 setStep("camera");
               }}
+              variant="gradient"
               icon="camera"
             />
           </View>
@@ -139,12 +184,7 @@ export default function VerifyScreen() {
       {/* Camera Step */}
       {step === "camera" && permission?.granted && (
         <View className="flex-1">
-          <CameraView
-            ref={cameraRef}
-            facing="front"
-            style={{ flex: 1 }}
-          >
-            {/* Overlay */}
+          <CameraView ref={cameraRef} facing="front" style={{ flex: 1 }}>
             <View className="flex-1 items-center justify-between py-8">
               {/* Instruction */}
               <View className="bg-black/60 px-6 py-3 rounded-full">
@@ -153,20 +193,48 @@ export default function VerifyScreen() {
                 </Text>
               </View>
 
-              {/* Face guide oval */}
+              {/* Face guide oval — green when no error, red when error */}
               <View
-                className="w-64 h-80 rounded-full border-4 border-white/40"
-                style={{ borderStyle: "dashed" }}
+                className="w-64 h-80 rounded-full"
+                style={{
+                  borderWidth: 4,
+                  borderStyle: "dashed",
+                  borderColor: captureError ? "rgba(239,68,68,0.8)" : "rgba(34,197,94,0.6)",
+                }}
               />
+
+              {/* Error message */}
+              {captureError && (
+                <View className="absolute top-1/2 mx-8 bg-red-500/90 px-4 py-2 rounded-xl">
+                  <Text className="text-sm font-medium text-white text-center">{captureError}</Text>
+                </View>
+              )}
 
               {/* Bottom controls */}
               <View className="items-center gap-3">
+                {/* Progress dots */}
+                <View className="flex-row gap-2">
+                  {POSE_INSTRUCTIONS.map((_, i) => (
+                    <View
+                      key={i}
+                      className={`w-3 h-3 rounded-full ${
+                        i < currentPose
+                          ? "bg-green-500"
+                          : i === currentPose
+                            ? "bg-white"
+                            : "bg-white/30"
+                      }`}
+                    />
+                  ))}
+                </View>
                 <Text className="text-sm text-white/80">
                   Photo {currentPose + 1} of {POSE_INSTRUCTIONS.length}
                 </Text>
                 <Pressable
                   onPress={takeSelfie}
+                  disabled={isCapturing}
                   className="w-20 h-20 rounded-full border-4 border-white items-center justify-center"
+                  style={{ opacity: isCapturing ? 0.5 : 1 }}
                 >
                   <View className="w-16 h-16 rounded-full bg-white" />
                 </Pressable>
@@ -184,7 +252,7 @@ export default function VerifyScreen() {
           </Text>
           <View className="flex-row gap-3 mb-6">
             {photos.map((uri, i) => (
-              <View key={i} className="flex-1 aspect-square rounded-card overflow-hidden">
+              <View key={i} className="flex-1 aspect-square rounded-2xl overflow-hidden">
                 <Image
                   source={{ uri }}
                   style={{ width: "100%", height: "100%" }}
@@ -197,7 +265,7 @@ export default function VerifyScreen() {
             Make sure your face is clearly visible in all photos. These will be used to verify your identity and won't be shown on your profile.
           </Text>
           <View className="mt-auto pb-6 gap-3">
-            <Button title="Submit for Verification" onPress={handleSubmit} />
+            <Button title="Submit for Verification" onPress={handleSubmit} variant="gradient" />
             <Pressable onPress={handleRetry} className="py-3 items-center">
               <Text className="text-base font-medium text-primary-500">Retake Photos</Text>
             </Pressable>
@@ -208,9 +276,14 @@ export default function VerifyScreen() {
       {/* Processing Step */}
       {step === "processing" && (
         <View className="flex-1 items-center justify-center px-8">
-          <View className="w-20 h-20 rounded-full bg-primary-100 items-center justify-center mb-6">
-            <Ionicons name="hourglass" size={36} color="#FF6B35" />
-          </View>
+          <Animated.View entering={FadeIn.duration(500)} className="w-20 h-20 rounded-full overflow-hidden mb-6">
+            <LinearGradient
+              colors={["#FF6B35", "#7C3AED"]}
+              style={{ width: 80, height: 80, borderRadius: 40, alignItems: "center", justifyContent: "center" }}
+            >
+              <Ionicons name="hourglass" size={36} color="#FFFFFF" />
+            </LinearGradient>
+          </Animated.View>
           <Text className="text-xl font-bold text-neutral-900 dark:text-white text-center mb-2">
             Verifying...
           </Text>
@@ -223,17 +296,25 @@ export default function VerifyScreen() {
       {/* Complete Step */}
       {step === "complete" && (
         <View className="flex-1 items-center justify-center px-8">
-          <View className="w-24 h-24 rounded-full bg-green-100 items-center justify-center mb-6">
-            <Ionicons name="checkmark-circle" size={56} color="#22C55E" />
-          </View>
-          <Text className="text-2xl font-bold text-neutral-900 dark:text-white text-center mb-2">
+          <Animated.View entering={FadeIn.duration(500)} className="w-24 h-24 rounded-full overflow-hidden mb-6">
+            <LinearGradient
+              colors={["#22C55E", "#16A34A"]}
+              style={{ width: 96, height: 96, borderRadius: 48, alignItems: "center", justifyContent: "center" }}
+            >
+              <Ionicons name="checkmark-circle" size={56} color="#FFFFFF" />
+            </LinearGradient>
+          </Animated.View>
+          <Animated.Text
+            entering={FadeInDown.delay(200).duration(400)}
+            className="text-2xl font-bold text-neutral-900 dark:text-white text-center mb-2"
+          >
             You're Verified!
-          </Text>
+          </Animated.Text>
           <Text className="text-base text-neutral-500 text-center leading-6">
             Your profile now shows a verification badge. Verified profiles get significantly more matches!
           </Text>
           <View className="w-full mt-8">
-            <Button title="Back to Profile" onPress={() => router.back()} />
+            <Button title="Back to Profile" onPress={() => router.back()} variant="gradient" />
           </View>
         </View>
       )}

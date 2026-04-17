@@ -1,9 +1,18 @@
 import { View, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import * as Haptics from "expo-haptics";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withSequence,
+  withSpring,
+  FadeIn,
+} from "react-native-reanimated";
 import { CardStack } from "@/components/cards/CardStack";
 import { ActionButtons } from "@/components/cards/ActionButtons";
 import { MatchModal } from "@/components/modals/MatchModal";
@@ -11,6 +20,48 @@ import { ReportSheet } from "@/components/modals/ReportSheet";
 import { useDiscoveryStore } from "@/lib/stores/discovery-store";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import type { UserProfile } from "@/lib/types/user";
+import { useState } from "react";
+
+function AnimatedEmptyState() {
+  const float = useSharedValue(0);
+
+  useEffect(() => {
+    float.value = withRepeat(
+      withSequence(
+        withSpring(-10, { damping: 10, stiffness: 40 }),
+        withSpring(10, { damping: 10, stiffness: 40 })
+      ),
+      -1,
+      true
+    );
+  }, [float]);
+
+  const floatStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: float.value }],
+  }));
+
+  return (
+    <View className="flex-1 items-center justify-center px-8">
+      <Animated.View
+        style={floatStyle}
+        className="w-24 h-24 rounded-full items-center justify-center mb-6 overflow-hidden"
+      >
+        <LinearGradient
+          colors={["#FF6B35", "#7C3AED"]}
+          style={{ width: 96, height: 96, borderRadius: 48, alignItems: "center", justifyContent: "center" }}
+        >
+          <Ionicons name="heart" size={44} color="#FFFFFF" />
+        </LinearGradient>
+      </Animated.View>
+      <Text className="text-xl font-bold text-neutral-900 dark:text-white text-center mb-2">
+        No more profiles
+      </Text>
+      <Text className="text-base text-neutral-500 text-center leading-6">
+        You've seen everyone nearby! Check back later or expand your preferences to see more people.
+      </Text>
+    </View>
+  );
+}
 
 export default function DiscoverScreen() {
   const {
@@ -35,7 +86,7 @@ export default function DiscoverScreen() {
 
   const hasProfiles = currentIndex < profiles.length;
 
-  const handleSwipeRight = (profile: UserProfile) => {
+  const handleSwipeRight = (_profile: UserProfile) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     swipeRight({ type: "profile" });
   };
@@ -45,7 +96,7 @@ export default function DiscoverScreen() {
     swipeLeft();
   };
 
-  const handleSuperLike = (profile: UserProfile) => {
+  const handleSuperLike = (_profile: UserProfile) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     superLike({ type: "profile" });
   };
@@ -68,17 +119,36 @@ export default function DiscoverScreen() {
   return (
     <SafeAreaView className="flex-1 bg-neutral-50 dark:bg-neutral-900">
       {/* Header */}
-      <View className="flex-row items-center justify-between px-5 py-3">
+      <Animated.View
+        entering={FadeIn.duration(400)}
+        className="flex-row items-center justify-between px-5 py-3"
+      >
         <View className="flex-row items-center gap-2">
           <Ionicons name="flame" size={28} color="#FF6B35" />
-          <Text className="text-2xl font-bold text-primary-500">Rasaya</Text>
+          <Text
+            className="text-2xl font-bold"
+            style={{ color: "#FF6B35" }}
+          >
+            Rasaya
+          </Text>
         </View>
-        <View className="flex-row gap-2">
-          <View className="w-10 h-10 rounded-full bg-white dark:bg-neutral-800 items-center justify-center shadow-sm">
-            <Ionicons name="options" size={20} color="#737373" />
-          </View>
+        <View
+          className="w-10 h-10 rounded-full items-center justify-center"
+          style={{
+            backgroundColor: "rgba(255,107,53,0.1)",
+          }}
+        >
+          <Ionicons name="options" size={20} color="#FF6B35" />
         </View>
-      </View>
+      </Animated.View>
+
+      {/* Gradient separator */}
+      <LinearGradient
+        colors={["#FF6B35", "#7C3AED", "transparent"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        className="h-[1px] mx-5 mb-2"
+      />
 
       {/* Card Stack */}
       {hasProfiles ? (
@@ -100,18 +170,7 @@ export default function DiscoverScreen() {
           />
         </View>
       ) : (
-        /* Empty State */
-        <View className="flex-1 items-center justify-center px-8">
-          <View className="w-20 h-20 rounded-full bg-primary-100 items-center justify-center mb-4">
-            <Ionicons name="search" size={36} color="#FF6B35" />
-          </View>
-          <Text className="text-xl font-bold text-neutral-900 dark:text-white text-center mb-2">
-            No more profiles
-          </Text>
-          <Text className="text-base text-neutral-500 text-center leading-6">
-            You've seen everyone nearby! Check back later or expand your preferences to see more people.
-          </Text>
-        </View>
+        <AnimatedEmptyState />
       )}
 
       {/* Match Modal */}
@@ -121,7 +180,6 @@ export default function DiscoverScreen() {
         matchedUser={matchedProfile}
         onSendMessage={() => {
           dismissMatchModal();
-          // Navigate to chat with the matched user
           if (matchedProfile && currentUser) {
             const [smaller, larger] = [currentUser.uid, matchedProfile.uid].sort();
             router.push(`/(app)/(matches)/chat/${smaller}_${larger}`);

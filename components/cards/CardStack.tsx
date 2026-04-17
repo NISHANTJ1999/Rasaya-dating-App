@@ -1,6 +1,8 @@
-import { View, Dimensions } from "react-native";
+import { View, Text, Dimensions } from "react-native";
 import { useCallback } from "react";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -69,17 +71,14 @@ export function CardStack({
     })
     .onEnd((event) => {
       if (event.translationX > SWIPE_THRESHOLD) {
-        // Swipe right - LIKE
         translateX.value = withTiming(SCREEN_WIDTH * 1.5, { duration: 300 });
         cardRotation.value = withTiming(30, { duration: 300 });
         runOnJS(handleSwipeComplete)("right");
       } else if (event.translationX < -SWIPE_THRESHOLD) {
-        // Swipe left - NOPE
         translateX.value = withTiming(-SCREEN_WIDTH * 1.5, { duration: 300 });
         cardRotation.value = withTiming(-30, { duration: 300 });
         runOnJS(handleSwipeComplete)("left");
       } else if (event.translationY < -150) {
-        // Swipe up - SUPER LIKE
         translateY.value = withTiming(-SCREEN_WIDTH * 2, { duration: 300 });
         runOnJS(handleSwipeComplete)("up");
       } else {
@@ -105,13 +104,10 @@ export function CardStack({
     const opacity = interpolate(
       Math.abs(translateX.value),
       [0, SCREEN_WIDTH * 0.3],
-      [0.6, 1],
+      [0.5, 1],
       Extrapolation.CLAMP
     );
-    return {
-      transform: [{ scale }],
-      opacity,
-    };
+    return { transform: [{ scale }], opacity };
   });
 
   const likeOpacity = useAnimatedStyle(() => ({
@@ -132,9 +128,16 @@ export function CardStack({
     ),
   }));
 
-  if (!currentProfile) {
-    return null;
-  }
+  const superLikeOpacity = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      translateY.value,
+      [0, -120],
+      [0, 1],
+      Extrapolation.CLAMP
+    ),
+  }));
+
+  if (!currentProfile) return null;
 
   return (
     <View className="flex-1 items-center justify-center">
@@ -158,33 +161,52 @@ export function CardStack({
       <GestureDetector gesture={panGesture}>
         <Animated.View
           style={[
-            {
-              width: SCREEN_WIDTH - 32,
-              height: "100%",
-            },
+            { width: SCREEN_WIDTH - 32, height: "100%" },
             frontCardStyle,
           ]}
         >
           <ProfileCard profile={currentProfile} onReport={onReport} />
 
-          {/* LIKE Overlay */}
+          {/* LIKE Overlay — gradient glass badge */}
           <Animated.View
             style={[likeOpacity]}
-            className="absolute top-6 left-6 px-4 py-2 border-4 border-like rounded-xl -rotate-12"
+            className="absolute top-8 left-6 -rotate-12 rounded-2xl overflow-hidden"
           >
-            <Animated.Text className="text-3xl font-bold text-like">
-              LIKE
-            </Animated.Text>
+            <LinearGradient
+              colors={["rgba(34,197,94,0.9)", "rgba(34,197,94,0.7)"]}
+              className="flex-row items-center px-5 py-2.5 gap-2"
+            >
+              <Ionicons name="heart" size={22} color="#FFFFFF" />
+              <Text className="text-2xl font-bold text-white">LIKE</Text>
+            </LinearGradient>
           </Animated.View>
 
-          {/* NOPE Overlay */}
+          {/* NOPE Overlay — gradient glass badge */}
           <Animated.View
             style={[nopeOpacity]}
-            className="absolute top-6 right-6 px-4 py-2 border-4 border-nope rounded-xl rotate-12"
+            className="absolute top-8 right-6 rotate-12 rounded-2xl overflow-hidden"
           >
-            <Animated.Text className="text-3xl font-bold text-nope">
-              NOPE
-            </Animated.Text>
+            <LinearGradient
+              colors={["rgba(239,68,68,0.9)", "rgba(239,68,68,0.7)"]}
+              className="flex-row items-center px-5 py-2.5 gap-2"
+            >
+              <Ionicons name="close" size={22} color="#FFFFFF" />
+              <Text className="text-2xl font-bold text-white">NOPE</Text>
+            </LinearGradient>
+          </Animated.View>
+
+          {/* SUPER LIKE Overlay */}
+          <Animated.View
+            style={[superLikeOpacity]}
+            className="absolute bottom-20 self-center rounded-2xl overflow-hidden"
+          >
+            <LinearGradient
+              colors={["rgba(59,130,246,0.9)", "rgba(124,58,237,0.9)"]}
+              className="flex-row items-center px-5 py-2.5 gap-2"
+            >
+              <Ionicons name="star" size={20} color="#FFFFFF" />
+              <Text className="text-xl font-bold text-white">SUPER LIKE</Text>
+            </LinearGradient>
           </Animated.View>
         </Animated.View>
       </GestureDetector>

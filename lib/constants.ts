@@ -67,6 +67,8 @@ export const INTERESTS = [
 export const COLORS = {
   primary: "#FF6B35",
   secondary: "#EC4899",
+  violet: "#7C3AED",
+  violetLight: "#B388FF",
   like: "#22C55E",
   nope: "#EF4444",
   superlike: "#3B82F6",
@@ -77,4 +79,11 @@ export const COLORS = {
   textSecondary: "#737373",
   border: "#E5E5E5",
   borderDark: "#404040",
+} as const;
+
+export const GRADIENTS = {
+  primaryToViolet: ["#FF6B35", "#7C3AED"] as const,
+  warmSunset: ["#FF6B35", "#EC4899", "#7C3AED"] as const,
+  glass: ["rgba(255,255,255,0.15)", "rgba(255,255,255,0.05)"] as const,
+  cardOverlay: ["transparent", "rgba(0,0,0,0.65)"] as const,
 } as const;

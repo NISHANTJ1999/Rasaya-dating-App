@@ -36,6 +36,9 @@ export interface UserProfile {
   bio?: string;
   preferences: UserPreferences;
   isVerified: boolean;
+  iqVerified?: boolean;
+  iqCompletedAt?: string;
+  iqAttemptedAt?: string;
   isActive: boolean;
   onboardingComplete: boolean;
   onboardingStep: number;

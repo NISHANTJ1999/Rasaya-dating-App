@@ -4,6 +4,8 @@ import { router } from "expo-router";
 import { Image } from "expo-image";
 import { useEffect } from "react";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { useMatchesStore } from "@/lib/stores/matches-store";
 import type { Match } from "@/lib/types/match";
 
@@ -38,18 +40,18 @@ export default function MatchesScreen() {
   const conversations = matches.filter((m) => m.lastMessage);
 
   return (
-    <SafeAreaView className="flex-1 bg-white dark:bg-neutral-900">
+    <SafeAreaView className="flex-1 bg-neutral-50 dark:bg-neutral-900">
       {/* Header */}
-      <View className="px-5 py-4">
+      <Animated.View entering={FadeIn.duration(400)} className="px-5 py-4">
         <Text className="text-2xl font-bold text-neutral-900 dark:text-white">
           Matches
         </Text>
-      </View>
+      </Animated.View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* New Matches - Horizontal */}
         {newMatches.length > 0 && (
-          <View className="mb-4">
+          <Animated.View entering={FadeInDown.delay(200).duration(400)} className="mb-4">
             <Text className="text-sm font-semibold text-neutral-500 uppercase tracking-wide px-5 mb-3">
               New Matches
             </Text>
@@ -69,15 +71,23 @@ export default function MatchesScreen() {
                     }
                     className="items-center"
                   >
-                    <View className="relative mb-1">
-                      <Image
-                        source={{ uri: other.photoUrl }}
-                        style={{ width: 72, height: 72, borderRadius: 36 }}
-                        contentFit="cover"
-                      />
-                      <View className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-primary-500 border-2 border-white items-center justify-center">
-                        <Ionicons name="heart" size={10} color="#FFFFFF" />
-                      </View>
+                    <View className="relative mb-1 p-[2px] rounded-full overflow-hidden">
+                      <LinearGradient
+                        colors={["#FF6B35", "#7C3AED"]}
+                        className="p-[2px] rounded-full"
+                      >
+                        <Image
+                          source={{ uri: other.photoUrl }}
+                          style={{
+                            width: 68,
+                            height: 68,
+                            borderRadius: 34,
+                            borderWidth: 2,
+                            borderColor: "#FFFFFF",
+                          }}
+                          contentFit="cover"
+                        />
+                      </LinearGradient>
                     </View>
                     <Text className="text-sm font-medium text-neutral-900 dark:text-white">
                       {other.firstName}
@@ -86,7 +96,7 @@ export default function MatchesScreen() {
                 );
               })}
             </ScrollView>
-          </View>
+          </Animated.View>
         )}
 
         {/* Conversations */}
@@ -96,8 +106,15 @@ export default function MatchesScreen() {
           </Text>
           {conversations.length === 0 ? (
             <View className="items-center py-12 px-8">
-              <Ionicons name="chatbubble-outline" size={48} color="#D4D4D4" />
-              <Text className="text-base text-neutral-400 text-center mt-3">
+              <View className="w-16 h-16 rounded-full overflow-hidden mb-3">
+                <LinearGradient
+                  colors={["#FF6B35", "#7C3AED"]}
+                  style={{ width: 64, height: 64, alignItems: "center", justifyContent: "center", opacity: 0.2 }}
+                >
+                  <Ionicons name="chatbubble-outline" size={28} color="#FF6B35" />
+                </LinearGradient>
+              </View>
+              <Text className="text-base text-neutral-400 text-center">
                 No conversations yet. Match with someone and start chatting!
               </Text>
             </View>
@@ -106,43 +123,45 @@ export default function MatchesScreen() {
               data={conversations}
               scrollEnabled={false}
               keyExtractor={(item) => item.matchId}
-              renderItem={({ item: match }) => {
+              renderItem={({ item: match, index }) => {
                 const other = getOtherUser(match);
                 if (!other) return null;
                 return (
-                  <Pressable
-                    onPress={() =>
-                      router.push(`/(app)/(matches)/chat/${match.matchId}`)
-                    }
-                    className="flex-row items-center px-5 py-3 active:bg-neutral-50 dark:active:bg-neutral-800"
-                  >
-                    <Image
-                      source={{ uri: other.photoUrl }}
-                      style={{ width: 56, height: 56, borderRadius: 28 }}
-                      contentFit="cover"
-                    />
-                    <View className="flex-1 ml-3">
-                      <View className="flex-row items-center justify-between">
-                        <Text className="text-base font-semibold text-neutral-900 dark:text-white">
-                          {other.firstName}
-                        </Text>
+                  <Animated.View entering={FadeInDown.delay(300 + index * 80).duration(400)}>
+                    <Pressable
+                      onPress={() =>
+                        router.push(`/(app)/(matches)/chat/${match.matchId}`)
+                      }
+                      className="flex-row items-center px-5 py-3 active:bg-neutral-100 dark:active:bg-neutral-800"
+                    >
+                      <Image
+                        source={{ uri: other.photoUrl }}
+                        style={{ width: 56, height: 56, borderRadius: 28 }}
+                        contentFit="cover"
+                      />
+                      <View className="flex-1 ml-3">
+                        <View className="flex-row items-center justify-between">
+                          <Text className="text-base font-semibold text-neutral-900 dark:text-white">
+                            {other.firstName}
+                          </Text>
+                          {match.lastMessage && (
+                            <Text className="text-xs text-neutral-400">
+                              {formatTime(match.lastMessage.sentAt)}
+                            </Text>
+                          )}
+                        </View>
                         {match.lastMessage && (
-                          <Text className="text-xs text-neutral-400">
-                            {formatTime(match.lastMessage.sentAt)}
+                          <Text
+                            className="text-sm text-neutral-500 mt-0.5"
+                            numberOfLines={1}
+                          >
+                            {match.lastMessage.senderId === "currentUser" ? "You: " : ""}
+                            {match.lastMessage.text}
                           </Text>
                         )}
                       </View>
-                      {match.lastMessage && (
-                        <Text
-                          className="text-sm text-neutral-500 mt-0.5"
-                          numberOfLines={1}
-                        >
-                          {match.lastMessage.senderId === "currentUser" ? "You: " : ""}
-                          {match.lastMessage.text}
-                        </Text>
-                      )}
-                    </View>
-                  </Pressable>
+                    </Pressable>
+                  </Animated.View>
                 );
               }}
             />

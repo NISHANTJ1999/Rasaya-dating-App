@@ -4,6 +4,9 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useState, useRef, useEffect } from "react";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import * as Haptics from "expo-haptics";
+import Animated, { FadeInUp } from "react-native-reanimated";
 import { useMatchesStore } from "@/lib/stores/matches-store";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { reportUser, blockUser } from "@/lib/firebase/firestore";
@@ -18,7 +21,6 @@ export default function ChatScreen() {
   const [reportOpen, setReportOpen] = useState(false);
   const flatListRef = useRef<FlatList<Message>>(null);
 
-  // Subscribe to real-time messages
   useEffect(() => {
     if (!matchId) return;
     const unsubscribe = subscribeChat(matchId);
@@ -35,6 +37,7 @@ export default function ChatScreen() {
 
   const handleSend = () => {
     if (!text.trim() || !matchId) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     sendMessage(matchId, text.trim());
     setText("");
     setTimeout(() => {
@@ -48,14 +51,14 @@ export default function ChatScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-white dark:bg-neutral-900">
+    <SafeAreaView className="flex-1 bg-neutral-50 dark:bg-neutral-900">
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         className="flex-1"
         keyboardVerticalOffset={0}
       >
         {/* Header */}
-        <View className="flex-row items-center px-4 py-3 border-b border-neutral-200 dark:border-neutral-800">
+        <View className="flex-row items-center px-4 py-3 bg-white dark:bg-neutral-900 border-b border-neutral-100 dark:border-neutral-800">
           <Pressable onPress={() => router.back()} className="mr-3 p-1">
             <Ionicons name="arrow-back" size={24} color="#171717" />
           </Pressable>
@@ -117,37 +120,56 @@ export default function ChatScreen() {
               )}
             </View>
           )}
-          renderItem={({ item: message }) => {
+          renderItem={({ item: message, index }) => {
             const isMe = message.senderId === "currentUser";
             return (
-              <View
+              <Animated.View
+                entering={FadeInUp.delay(index * 30).duration(300)}
                 className={`mb-2 max-w-[80%] ${isMe ? "self-end" : "self-start"}`}
               >
-                <View
-                  className={`px-4 py-2.5 rounded-2xl ${
-                    isMe
-                      ? "bg-primary-500 rounded-br-sm"
-                      : "bg-neutral-100 dark:bg-neutral-800 rounded-bl-sm"
-                  }`}
-                >
-                  <Text
-                    className={`text-base ${isMe ? "text-white" : "text-neutral-900 dark:text-white"}`}
+                {isMe ? (
+                  <LinearGradient
+                    colors={["#FF6B35", "#E8541E"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    className="px-4 py-2.5 rounded-2xl rounded-br-sm"
+                    style={{
+                      shadowColor: "#FF6B35",
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.15,
+                      shadowRadius: 6,
+                      elevation: 3,
+                    }}
                   >
-                    {message.text}
-                  </Text>
-                </View>
+                    <Text className="text-base text-white">{message.text}</Text>
+                  </LinearGradient>
+                ) : (
+                  <View className="px-4 py-2.5 rounded-2xl rounded-bl-sm bg-white dark:bg-neutral-800"
+                    style={{
+                      shadowColor: "#000",
+                      shadowOffset: { width: 0, height: 1 },
+                      shadowOpacity: 0.05,
+                      shadowRadius: 4,
+                      elevation: 1,
+                    }}
+                  >
+                    <Text className="text-base text-neutral-900 dark:text-white">
+                      {message.text}
+                    </Text>
+                  </View>
+                )}
                 <Text
                   className={`text-xs text-neutral-400 mt-0.5 ${isMe ? "text-right" : "text-left"}`}
                 >
                   {formatMessageTime(message.createdAt)}
                 </Text>
-              </View>
+              </Animated.View>
             );
           }}
         />
 
         {/* Message Input */}
-        <View className="flex-row items-center px-4 py-3 border-t border-neutral-200 dark:border-neutral-800 gap-2">
+        <View className="flex-row items-center px-4 py-3 bg-white dark:bg-neutral-900 border-t border-neutral-100 dark:border-neutral-800 gap-2">
           <TextInput
             value={text}
             onChangeText={setText}
@@ -160,15 +182,20 @@ export default function ChatScreen() {
           <Pressable
             onPress={handleSend}
             disabled={!text.trim()}
-            className={`w-10 h-10 rounded-full items-center justify-center ${
-              text.trim() ? "bg-primary-500" : "bg-neutral-200 dark:bg-neutral-700"
-            }`}
+            className="w-10 h-10 rounded-full items-center justify-center overflow-hidden"
           >
-            <Ionicons
-              name="send"
-              size={18}
-              color={text.trim() ? "#FFFFFF" : "#A3A3A3"}
-            />
+            {text.trim() ? (
+              <LinearGradient
+                colors={["#FF6B35", "#7C3AED"]}
+                style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center", borderRadius: 20 }}
+              >
+                <Ionicons name="send" size={18} color="#FFFFFF" />
+              </LinearGradient>
+            ) : (
+              <View className="w-10 h-10 rounded-full bg-neutral-200 dark:bg-neutral-700 items-center justify-center">
+                <Ionicons name="send" size={18} color="#A3A3A3" />
+              </View>
+            )}
           </Pressable>
         </View>
       </KeyboardAvoidingView>
