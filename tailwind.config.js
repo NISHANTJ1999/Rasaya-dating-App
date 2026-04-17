@@ -1,0 +1,63 @@
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
+  presets: [require("nativewind/preset")],
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        primary: {
+          50: "#FFF5F0",
+          100: "#FFE8DB",
+          200: "#FFD0B5",
+          300: "#FFB088",
+          400: "#FF8A5C",
+          500: "#FF6B35",
+          600: "#E8541E",
+          700: "#C4410A",
+          800: "#9E3508",
+          900: "#7A2A06",
+        },
+        secondary: {
+          50: "#FDF2F8",
+          100: "#FCE7F3",
+          200: "#FBCFE8",
+          300: "#F9A8D4",
+          400: "#F472B6",
+          500: "#EC4899",
+          600: "#DB2777",
+          700: "#BE185D",
+          800: "#9D174D",
+          900: "#831843",
+        },
+        neutral: {
+          50: "#FAFAFA",
+          100: "#F5F5F5",
+          200: "#E5E5E5",
+          300: "#D4D4D4",
+          400: "#A3A3A3",
+          500: "#737373",
+          600: "#525252",
+          700: "#404040",
+          800: "#262626",
+          900: "#171717",
+        },
+        like: "#22C55E",
+        nope: "#EF4444",
+        superlike: "#3B82F6",
+      },
+      fontFamily: {
+        sans: ["Inter_400Regular"],
+        medium: ["Inter_500Medium"],
+        semibold: ["Inter_600SemiBold"],
+        bold: ["Inter_700Bold"],
+      },
+      borderRadius: {
+        card: "16px",
+        button: "12px",
+        chip: "20px",
+      },
+    },
+  },
+  plugins: [],
+};
