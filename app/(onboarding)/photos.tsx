@@ -1,10 +1,13 @@
-import { View, Text, Pressable, Alert } from "react-native";
+import { View, Text, Pressable, Alert, ActivityIndicator } from "react-native";
+import { useState } from "react";
 import { router } from "expo-router";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import * as Haptics from "expo-haptics";
 import { StepContainer } from "@/components/onboarding/StepContainer";
 import { useAuthStore } from "@/lib/stores/auth-store";
+import { validateProfilePhoto } from "@/lib/photo-validation";
 
 const MAX_PHOTOS = 6;
 const MIN_PHOTOS = 2;
@@ -12,6 +15,7 @@ const MIN_PHOTOS = 2;
 export default function PhotosStep() {
   const { onboardingData, updateOnboarding } = useAuthStore();
   const photos = onboardingData.photos;
+  const [validatingSlot, setValidatingSlot] = useState<number | null>(null);
 
   const pickImage = async (index: number) => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -22,11 +26,28 @@ export default function PhotosStep() {
     });
 
     if (!result.canceled && result.assets[0]) {
+      const uri = result.assets[0].uri;
+
+      // On-device face check — reject memes, objects, group shots
+      setValidatingSlot(index);
+      const check = await validateProfilePhoto(uri);
+      setValidatingSlot(null);
+
+      if (!check.valid) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        Alert.alert(
+          "Photo not accepted",
+          check.reason ?? "Please choose a clear photo of yourself.",
+          [{ text: "Try another", onPress: () => pickImage(index) }, { text: "Cancel" }]
+        );
+        return;
+      }
+
       const newPhotos = [...photos];
       const existing = newPhotos.findIndex((p) => p.order === index);
       const photo = {
         id: `photo_${index}`,
-        uri: result.assets[0].uri,
+        uri,
         order: index,
       };
 
@@ -93,15 +114,27 @@ export default function PhotosStep() {
                 ) : (
                   <Pressable
                     onPress={() => pickImage(index)}
+                    disabled={validatingSlot !== null}
                     className={`flex-1 rounded-card border-2 border-dashed items-center justify-center ${
                       isRequired ? "border-primary-300 bg-primary-50" : "border-neutral-300 dark:border-neutral-600 bg-neutral-50 dark:bg-neutral-800"
                     }`}
                   >
-                    <View className="w-10 h-10 rounded-full bg-primary-500 items-center justify-center mb-1">
-                      <Ionicons name="add" size={24} color="#FFFFFF" />
-                    </View>
-                    {isRequired && (
-                      <Text className="text-xs text-primary-500 font-medium">Required</Text>
+                    {validatingSlot === index ? (
+                      <>
+                        <ActivityIndicator color="#FF6B35" />
+                        <Text className="text-[10px] text-primary-500 font-medium mt-2">
+                          Checking face…
+                        </Text>
+                      </>
+                    ) : (
+                      <>
+                        <View className="w-10 h-10 rounded-full bg-primary-500 items-center justify-center mb-1">
+                          <Ionicons name="add" size={24} color="#FFFFFF" />
+                        </View>
+                        {isRequired && (
+                          <Text className="text-xs text-primary-500 font-medium">Required</Text>
+                        )}
+                      </>
                     )}
                   </Pressable>
                 )}

@@ -1,0 +1,68 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() { return request.auth != null; }
+    function isSelf(uid) { return isSignedIn() && request.auth.uid == uid; }
+
+    // Profiles: read any active user; write only yourself; can't change
+    // moderation-controlled fields from the client.
+    match /users/{uid} {
+      allow read: if isSignedIn() && resource.data.isActive == true;
+      allow create: if isSelf(uid);
+      allow update: if isSelf(uid)
+        && !('isActive' in request.resource.data.diff(resource.data).affectedKeys())
+        && !('bannedAt' in request.resource.data.diff(resource.data).affectedKeys())
+        && !('banReason' in request.resource.data.diff(resource.data).affectedKeys())
+        && !('isVerified' in request.resource.data.diff(resource.data).affectedKeys());
+    }
+
+    // Moderation docs: only Cloud Functions (admin SDK) can touch these.
+    match /moderation/{uid} {
+      allow read: if false;
+      allow write: if false;
+    }
+
+    // Swipes: you can only create your own.
+    match /swipes/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.swiperId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // Matches: only participants read; no client writes (functions handle it).
+    match /matches/{matchId} {
+      allow read: if isSignedIn() && request.auth.uid in resource.data.userIds;
+      allow write: if false;
+
+      match /messages/{messageId} {
+        allow read: if isSignedIn() &&
+          request.auth.uid in get(/databases/$(database)/documents/matches/$(matchId)).data.userIds;
+        allow create: if isSignedIn()
+          && request.resource.data.senderId == request.auth.uid
+          && request.auth.uid in get(/databases/$(database)/documents/matches/$(matchId)).data.userIds
+          && request.resource.data.text is string
+          && request.resource.data.text.size() <= 1000;
+        allow update, delete: if false;
+      }
+    }
+
+    // Reports: users can create, but not read others' reports.
+    match /reports/{id} {
+      allow create: if isSignedIn()
+        && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.reportedUserId != request.auth.uid;
+      allow read, update, delete: if false;
+    }
+
+    // Blocks: manage your own only.
+    match /blocks/{id} {
+      allow read, create, delete: if isSignedIn()
+        && request.resource.data.blockerId == request.auth.uid;
+    }
+
+    // Flagged messages: server-only.
+    match /flaggedMessages/{id} {
+      allow read, write: if false;
+    }
+  }
+}

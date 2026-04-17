@@ -22,6 +22,7 @@ interface CardStackProps {
   onSwipeRight: (profile: UserProfile) => void;
   onSwipeLeft: (profile: UserProfile) => void;
   onSuperLike: (profile: UserProfile) => void;
+  onReport?: (profile: UserProfile) => void;
 }
 
 export function CardStack({
@@ -30,6 +31,7 @@ export function CardStack({
   onSwipeRight,
   onSwipeLeft,
   onSuperLike,
+  onReport,
 }: CardStackProps) {
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -148,7 +150,7 @@ export function CardStack({
             backCardStyle,
           ]}
         >
-          <ProfileCard profile={nextProfile} />
+          <ProfileCard profile={nextProfile} onReport={onReport} />
         </Animated.View>
       )}
 
@@ -163,7 +165,7 @@ export function CardStack({
             frontCardStyle,
           ]}
         >
-          <ProfileCard profile={currentProfile} />
+          <ProfileCard profile={currentProfile} onReport={onReport} />
 
           {/* LIKE Overlay */}
           <Animated.View

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { Image } from "expo-image";
 import type { UserProfile } from "../types/user";
 import type { LikeTarget } from "../types/match";
 import { MOCK_PROFILES } from "../mock-data";
@@ -7,8 +8,19 @@ import {
   createSwipe,
   checkMutualLike,
   createMatch,
+  reportUser,
+  blockUser,
 } from "../firebase/firestore";
 import { useAuthStore } from "./auth-store";
+
+/** Warm the image cache for the next few profiles so swiping feels instant. */
+function prefetchUpcoming(profiles: UserProfile[], fromIndex: number) {
+  const uris = profiles
+    .slice(fromIndex, fromIndex + 3)
+    .flatMap((p) => p.photos.map((ph) => ph.uri))
+    .filter(Boolean);
+  if (uris.length) Image.prefetch(uris, "memory-disk");
+}
 
 interface DiscoveryState {
   profiles: UserProfile[];
@@ -22,6 +34,7 @@ interface DiscoveryState {
   swipeRight: (target?: LikeTarget) => Promise<void>;
   swipeLeft: () => void;
   superLike: (target?: LikeTarget) => Promise<void>;
+  reportAndBlock: (profileId: string, reason: string, description?: string) => Promise<void>;
   getCurrentProfile: () => UserProfile | null;
   resetDiscovery: () => void;
   dismissMatchModal: () => void;
@@ -49,6 +62,7 @@ export const useDiscoveryStore = create<DiscoveryState>((set, get) => ({
           ageMax: user.preferences.ageMax,
         });
         set({ profiles, currentIndex: 0, isLoading: false });
+        prefetchUpcoming(profiles, 0);
         return;
       } catch (error) {
         console.error("Failed to load profiles from Firebase:", error);
@@ -57,6 +71,7 @@ export const useDiscoveryStore = create<DiscoveryState>((set, get) => ({
 
     // Fallback to mock data
     set({ profiles: MOCK_PROFILES, currentIndex: 0, isLoading: false });
+    prefetchUpcoming(MOCK_PROFILES, 0);
   },
 
   swipeRight: async (target) => {
@@ -67,6 +82,7 @@ export const useDiscoveryStore = create<DiscoveryState>((set, get) => ({
     const newSwiped = new Set(swipedIds);
     newSwiped.add(profile.uid);
     set({ currentIndex: currentIndex + 1, swipedIds: newSwiped });
+    prefetchUpcoming(profiles, currentIndex + 1);
 
     const { useFirebase, firebaseUser, user } = useAuthStore.getState();
 
@@ -108,6 +124,7 @@ export const useDiscoveryStore = create<DiscoveryState>((set, get) => ({
     const newSwiped = new Set(swipedIds);
     newSwiped.add(profile.uid);
     set({ currentIndex: currentIndex + 1, swipedIds: newSwiped });
+    prefetchUpcoming(profiles, currentIndex + 1);
 
     const { useFirebase, firebaseUser } = useAuthStore.getState();
     if (useFirebase && firebaseUser) {
@@ -123,6 +140,7 @@ export const useDiscoveryStore = create<DiscoveryState>((set, get) => ({
     const newSwiped = new Set(swipedIds);
     newSwiped.add(profile.uid);
     set({ currentIndex: currentIndex + 1, swipedIds: newSwiped });
+    prefetchUpcoming(profiles, currentIndex + 1);
 
     const { useFirebase, firebaseUser, user } = useAuthStore.getState();
 
@@ -151,6 +169,31 @@ export const useDiscoveryStore = create<DiscoveryState>((set, get) => ({
         }
       } catch (error) {
         console.error("Failed to record super like:", error);
+      }
+    }
+  },
+
+  reportAndBlock: async (profileId, reason, description) => {
+    const { profiles, currentIndex, swipedIds } = get();
+
+    // Remove the profile from the visible deck immediately (optimistic)
+    const remaining = profiles.filter((p) => p.uid !== profileId);
+    // Keep currentIndex pointing at whatever card is "next" after removal
+    const newIndex = Math.min(currentIndex, Math.max(0, remaining.length - 1));
+    const newSwiped = new Set(swipedIds);
+    newSwiped.add(profileId);
+    set({ profiles: remaining, currentIndex: newIndex, swipedIds: newSwiped });
+    prefetchUpcoming(remaining, newIndex);
+
+    const { useFirebase, firebaseUser } = useAuthStore.getState();
+    if (useFirebase && firebaseUser) {
+      try {
+        await Promise.all([
+          reportUser(firebaseUser.uid, profileId, reason, description),
+          blockUser(firebaseUser.uid, profileId),
+        ]);
+      } catch (error) {
+        console.error("Failed to submit report:", error);
       }
     }
   },

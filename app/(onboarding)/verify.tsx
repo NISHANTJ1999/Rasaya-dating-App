@@ -9,6 +9,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { Button } from "@/components/ui/Button";
 import { useAuthStore } from "@/lib/stores/auth-store";
+import { validateSelfie } from "@/lib/photo-validation";
 
 type Step = "intro" | "camera" | "review" | "processing" | "complete";
 
@@ -23,17 +24,30 @@ export default function MandatoryVerifyScreen() {
   const [currentPose, setCurrentPose] = useState(0);
   const [photos, setPhotos] = useState<string[]>([]);
   const [permission, requestPermission] = useCameraPermissions();
+  const [captureError, setCaptureError] = useState<string | null>(null);
+  const [isCapturing, setIsCapturing] = useState(false);
   const cameraRef = useRef<CameraView>(null);
   const { completeVerification } = useAuthStore();
 
   const takeSelfie = async () => {
-    if (!cameraRef.current) return;
+    if (!cameraRef.current || isCapturing) return;
 
     try {
+      setIsCapturing(true);
+      setCaptureError(null);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.8 });
 
       if (photo?.uri) {
+        // On-device check: exactly one well-framed face
+        const check = await validateSelfie(photo.uri);
+        if (!check.valid) {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          setCaptureError(check.reason ?? "Couldn't detect your face. Try again.");
+          setIsCapturing(false);
+          return;
+        }
+
         const newPhotos = [...photos, photo.uri];
         setPhotos(newPhotos);
 
@@ -45,6 +59,8 @@ export default function MandatoryVerifyScreen() {
       }
     } catch (error) {
       console.error("Failed to take photo:", error);
+    } finally {
+      setIsCapturing(false);
     }
   };
 
@@ -170,15 +186,19 @@ export default function MandatoryVerifyScreen() {
             <View className="flex-1">
               <CameraView ref={cameraRef} facing="front" style={{ flex: 1 }}>
                 <View className="flex-1 items-center justify-between py-8">
-                  {/* Instruction Banner */}
-                  <View className="bg-black/60 px-6 py-3 rounded-full flex-row items-center gap-2">
+                  {/* Instruction / Error Banner */}
+                  <View
+                    className={`px-6 py-3 rounded-full flex-row items-center gap-2 ${
+                      captureError ? "bg-red-500/90" : "bg-black/60"
+                    }`}
+                  >
                     <Ionicons
-                      name={POSE_INSTRUCTIONS[currentPose].icon}
+                      name={captureError ? "alert-circle" : POSE_INSTRUCTIONS[currentPose].icon}
                       size={18}
                       color="#FFFFFF"
                     />
                     <Text className="text-base font-semibold text-white">
-                      {POSE_INSTRUCTIONS[currentPose].text}
+                      {captureError ?? POSE_INSTRUCTIONS[currentPose].text}
                     </Text>
                   </View>
 
@@ -210,9 +230,12 @@ export default function MandatoryVerifyScreen() {
                     </Text>
                     <Pressable
                       onPress={takeSelfie}
+                      disabled={isCapturing}
                       className="w-20 h-20 rounded-full border-4 border-white items-center justify-center"
                     >
-                      <View className="w-16 h-16 rounded-full bg-white" />
+                      <View
+                        className={`w-16 h-16 rounded-full ${isCapturing ? "bg-white/50" : "bg-white"}`}
+                      />
                     </Pressable>
                   </View>
                 </View>

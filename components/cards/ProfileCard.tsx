@@ -20,6 +20,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get("window");
 interface ProfileCardProps {
   profile: UserProfile;
   onLikePrompt?: (promptId: string, comment?: string) => void;
+  onReport?: (profile: UserProfile) => void;
 }
 
 function AnimatedHeartButton({ onPress }: { onPress: () => void }) {
@@ -50,7 +51,7 @@ function AnimatedHeartButton({ onPress }: { onPress: () => void }) {
   );
 }
 
-export function ProfileCard({ profile, onLikePrompt }: ProfileCardProps) {
+export function ProfileCard({ profile, onLikePrompt, onReport }: ProfileCardProps) {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [likeSheetVisible, setLikeSheetVisible] = useState(false);
   const [selectedPrompt, setSelectedPrompt] = useState<{
@@ -104,7 +105,10 @@ export function ProfileCard({ profile, onLikePrompt }: ProfileCardProps) {
             source={{ uri: profile.photos[currentPhotoIndex]?.uri }}
             style={{ width: "100%", height: "100%" }}
             contentFit="cover"
-            transition={200}
+            transition={150}
+            cachePolicy="memory-disk"
+            recyclingKey={profile.photos[currentPhotoIndex]?.id}
+            priority="high"
           />
 
           {/* Photo Navigation Tap Zones */}
@@ -127,6 +131,20 @@ export function ProfileCard({ profile, onLikePrompt }: ProfileCardProps) {
                 />
               ))}
             </View>
+          )}
+
+          {/* Report button (top-right) */}
+          {onReport && (
+            <Pressable
+              onPress={() => {
+                Haptics.selectionAsync();
+                onReport(profile);
+              }}
+              hitSlop={12}
+              className="absolute top-3 right-3 w-9 h-9 rounded-full bg-black/45 items-center justify-center"
+            >
+              <Ionicons name="flag-outline" size={18} color="#FFFFFF" />
+            </Pressable>
           )}
 
           {/* Bottom Gradient with Name */}

@@ -1,12 +1,13 @@
 import { View, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import * as Haptics from "expo-haptics";
 import { Ionicons } from "@expo/vector-icons";
 import { CardStack } from "@/components/cards/CardStack";
 import { ActionButtons } from "@/components/cards/ActionButtons";
 import { MatchModal } from "@/components/modals/MatchModal";
+import { ReportSheet } from "@/components/modals/ReportSheet";
 import { useDiscoveryStore } from "@/lib/stores/discovery-store";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import type { UserProfile } from "@/lib/types/user";
@@ -22,9 +23,11 @@ export default function DiscoverScreen() {
     showMatchModal,
     matchedProfile,
     dismissMatchModal,
+    reportAndBlock,
   } = useDiscoveryStore();
 
   const currentUser = useAuthStore((s) => s.user);
+  const [reportTarget, setReportTarget] = useState<UserProfile | null>(null);
 
   useEffect(() => {
     loadProfiles();
@@ -87,6 +90,7 @@ export default function DiscoverScreen() {
               onSwipeRight={handleSwipeRight}
               onSwipeLeft={handleSwipeLeft}
               onSuperLike={handleSuperLike}
+              onReport={(profile) => setReportTarget(profile)}
             />
           </View>
           <ActionButtons
@@ -124,6 +128,18 @@ export default function DiscoverScreen() {
           }
         }}
         onKeepSwiping={dismissMatchModal}
+      />
+
+      {/* Report Sheet */}
+      <ReportSheet
+        visible={reportTarget !== null}
+        userFirstName={reportTarget?.firstName}
+        onClose={() => setReportTarget(null)}
+        onSubmit={async (reason, description) => {
+          if (!reportTarget) return;
+          await reportAndBlock(reportTarget.uid, reason, description);
+          setReportTarget(null);
+        }}
       />
     </SafeAreaView>
   );

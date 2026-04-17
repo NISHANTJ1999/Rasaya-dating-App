@@ -1,16 +1,21 @@
-import { View, Text, TextInput, Pressable, FlatList, KeyboardAvoidingView, Platform } from "react-native";
+import { View, Text, TextInput, Pressable, FlatList, KeyboardAvoidingView, Platform, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState, useRef, useEffect } from "react";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { useMatchesStore } from "@/lib/stores/matches-store";
+import { useAuthStore } from "@/lib/stores/auth-store";
+import { reportUser, blockUser } from "@/lib/firebase/firestore";
+import { ReportSheet } from "@/components/modals/ReportSheet";
 import type { Message } from "@/lib/types/match";
 
 export default function ChatScreen() {
   const { matchId } = useLocalSearchParams<{ matchId: string }>();
   const { matches, getMessages, sendMessage, subscribeChat } = useMatchesStore();
+  const firebaseUser = useAuthStore((s) => s.firebaseUser);
   const [text, setText] = useState("");
+  const [reportOpen, setReportOpen] = useState(false);
   const flatListRef = useRef<FlatList<Message>>(null);
 
   // Subscribe to real-time messages
@@ -69,7 +74,19 @@ export default function ChatScreen() {
               </View>
             </View>
           )}
-          <Pressable className="p-2">
+          <Pressable
+            onPress={() => {
+              Alert.alert(otherUser?.firstName ?? "Options", undefined, [
+                {
+                  text: "Report & block",
+                  style: "destructive",
+                  onPress: () => setReportOpen(true),
+                },
+                { text: "Cancel", style: "cancel" },
+              ]);
+            }}
+            className="p-2"
+          >
             <Ionicons name="ellipsis-vertical" size={20} color="#737373" />
           </Pressable>
         </View>
@@ -155,6 +172,30 @@ export default function ChatScreen() {
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+
+      <ReportSheet
+        visible={reportOpen}
+        userFirstName={otherUser?.firstName}
+        onClose={() => setReportOpen(false)}
+        onSubmit={async (reason, description) => {
+          if (firebaseUser && otherUserId) {
+            try {
+              await Promise.all([
+                reportUser(firebaseUser.uid, otherUserId, reason, description),
+                blockUser(firebaseUser.uid, otherUserId),
+              ]);
+            } catch (error) {
+              console.error("Failed to report:", error);
+            }
+          }
+          setReportOpen(false);
+          Alert.alert(
+            "Report submitted",
+            "Thanks for keeping Rasaya safe. We'll review this account and you won't see them again.",
+            [{ text: "OK", onPress: () => router.back() }]
+          );
+        }}
+      />
     </SafeAreaView>
   );
 }

@@ -1,5 +1,11 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { initializeAuth, getReactNativePersistence } from "firebase/auth";
+import { initializeAuth } from "firebase/auth";
+// `getReactNativePersistence` exists at runtime in the RN entry point but is
+// not exposed in firebase's bundled TS types — import via require to avoid TS2305.
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { getReactNativePersistence } = require("firebase/auth") as {
+  getReactNativePersistence: (storage: unknown) => import("firebase/auth").Persistence;
+};
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import AsyncStorage from "@react-native-async-storage/async-storage";
