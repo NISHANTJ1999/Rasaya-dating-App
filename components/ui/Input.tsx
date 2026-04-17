@@ -1,4 +1,4 @@
-import { TextInput, View, Text } from "react-native";
+import { TextInput, View, Text, Platform } from "react-native";
 import { useState } from "react";
 
 interface InputProps {
@@ -35,27 +35,45 @@ export function Input({
           {label}
         </Text>
       )}
-      <TextInput
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor="#A3A3A3"
-        keyboardType={keyboardType}
-        maxLength={maxLength}
-        multiline={multiline}
-        autoFocus={autoFocus}
-        secureTextEntry={secureTextEntry}
-        onFocus={() => setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
-        className={`w-full px-4 py-3.5 text-base rounded-button bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-white ${
+      <View
+        style={
           isFocused
-            ? "border-2 border-primary-500"
-            : error
-              ? "border-2 border-red-500"
-              : "border-2 border-transparent"
-        } ${multiline ? "min-h-[100px] text-top" : ""}`}
-        style={multiline ? { textAlignVertical: "top" } : undefined}
-      />
+            ? Platform.select({
+                ios: {
+                  shadowColor: "#FF6B35",
+                  shadowOffset: { width: 0, height: 6 },
+                  shadowOpacity: 0.2,
+                  shadowRadius: 14,
+                },
+                android: { elevation: 4, borderRadius: 18 },
+              })
+            : undefined
+        }
+      >
+        <TextInput
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor="#A3A3A3"
+          keyboardType={keyboardType}
+          maxLength={maxLength}
+          multiline={multiline}
+          autoFocus={autoFocus}
+          secureTextEntry={secureTextEntry}
+          selectionColor="#FF6B35"
+          cursorColor="#FF6B35"
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          className={`w-full px-5 py-4 text-base font-medium rounded-button bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white ${
+            isFocused
+              ? "border-2 border-primary-500"
+              : error
+                ? "border-2 border-red-500"
+                : "border-2 border-neutral-200 dark:border-neutral-700"
+          } ${multiline ? "min-h-[100px]" : ""}`}
+          style={multiline ? { textAlignVertical: "top" } : undefined}
+        />
+      </View>
       {error && (
         <Text className="text-sm text-red-500 mt-1">{error}</Text>
       )}
